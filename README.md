@@ -32,9 +32,4 @@ I have found the performance of all three servers to be similar for small reques
 Briefly describe here how you implemented the project.
 part 1: I have implemented the redis web server using a modularized approach, I have defined functions to set a single set command or to get a single get command, and functions that make a client header, and also used robust input output to parse the header information received from client. To make my webserver robust I have used vector of strings to hold the strings corresponding to the keys and values instead of a single string. I also defined a parsing function that parses multiple set commands. The function sends a set command if it finds either & or the content has ended, and will repeat as long as the content is done. I have also defined my own functions that receive and send messages to clients and servers. To make it robust I send messages as vectors so that any size of messages can be sent without difficulty.
 
-## Misc
-Describe here whatever help (if any) you received from others while doing the assignment. No help at all.
 
-How difficult was the assignment? (1-5 scale) 3(it was not that difficult but I have to change my approach to pass the robustness tests)
-
-How long did you take completing? (in hours) around  20-25 hrs(in total)
