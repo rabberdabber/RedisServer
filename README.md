@@ -7,11 +7,17 @@
 
 bash
 $ wget http://download.redis.io/releases/redis-6.0.8.tar.gz
+
 $ tar xzf redis-6.0.8.tar.gz
+
 $ cd redis-6.0.8
+
 $ make
+
 $ cd src 
+
 $ ./redis-server --port [port]
+
 $ ./redis-cli - p [port]
 
 - Install libevent: "sudo apt-get install libevent-dev" 
