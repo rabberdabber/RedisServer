@@ -1,35 +1,70 @@
-# Assignment 2
 
-- Student ID: 20170844
-- Your Name: Bereket Assefa
-- Submission date and time: 17/10/20
 
-## Ethics Oath
-I pledge that I have followed all the ethical rules required by this course (e.g., not browsing the code from a disallowed source, not sharing my own code with others, so on) while carrying out this assignment, and that I will not distribute my code to anyone related to this course even after submission of this assignment. I will assume full responsibility if any violation is found later.
 
-Name: Bereket Assefa
-Date: 17/10/20
+### Before you start
 
-## Performance measurements
-Set 8kB-sized value into a specific key. Measure the time for running 1,000 concurrent GET requests on the key using `ab -c 1000 -n 1000`.
-- Part 1
-  - Completed requests: 1000
-  - Time taken for test: 140 ms
-  - 99%-ile completion time: 105 ms
-- Part 2
-  - Completed requests: 1000
-  - Time taken for test: 141 ms
-  - 99%-ile completion time: 99 ms
-- Part 3
-  - Completed requests: 1000
-  - Time taken for test: 132 ms
-  - 99%-ile completion time: 95 ms
+- Install redis (ref: [https://redis.io/download](https://redis.io/download))
 
-Briefly compare the performance of part 1 through 3 and explain the results.
-I have found the performance of all three servers to be similar for small requests like for 1000 requests. for 1000 requests with concurrency 1, I have found that the time taken by webserver_fork is 1.255 sec, webserver_thread is 1.245 sec and the webserver_libevent is 1.041 sec with all having 99 percentile serving time of 1 ms. for 10,000 requests with 100 concurrency I have found webserver_fork to take 1.091 sec with 13 ms of 99 percentile serving time. webserver_thread took 1.1 sec(greater time than webserver_fork) with 13 ms 99 percentile serving time. And webserver_libevent took 1.05 sec with 12 ms of 99 percentile serving time. for 1000 requests with 1000 concurrency webserver_fork took 140 ms with 105 ms 99 percentile serving time. Meanwhile webserver_thread took 141 ms with 99 ms 99 percentile serving time. And finally the webserver_libevent took 132 ms with 95 ms 99 percentile serving time. To conclude the webserver_libevent is more faster than all the servers but more or less they are similar in their efficiency. I would say webserver_thread and webserver_fork are rather equal in efficiency for 1000 requests and less. The webserver_libevent is not that efficient as it works with only one thread meanwhile the other servers have many processes or threads. I believe we can make the webserver_libevent quite faster using multiple threads.
+bash
+$ wget http://download.redis.io/releases/redis-6.0.8.tar.gz
+$ tar xzf redis-6.0.8.tar.gz
+$ cd redis-6.0.8
+$ make
+$ cd src 
+$ ./redis-server --port [port]
+$ ./redis-cli - p [port]
 
-## Brief description
-Briefly describe here how you implemented the project.
-part 1: I have implemented the redis web server using a modularized approach, I have defined functions to set a single set command or to get a single get command, and functions that make a client header, and also used robust input output to parse the header information received from client. To make my webserver robust I have used vector of strings to hold the strings corresponding to the keys and values instead of a single string. I also defined a parsing function that parses multiple set commands. The function sends a set command if it finds either & or the content has ended, and will repeat as long as the content is done. I have also defined my own functions that receive and send messages to clients and servers. To make it robust I send messages as vectors so that any size of messages can be sent without difficulty.
+- Install libevent: "sudo apt-get install libevent-dev" 
 
+
+
+### Running Example
+
+protocol:
+      GET: https://127.0.0.1:port/[key]
+
+      POST: (inside the post body) [key]=[value]&[key]=[value]&[key]=[value]
+
+- Client
+    - POST file that contains the key-value pairs
+     `ab -v 4 -p [file name] [http://]hostname[:webserver port]/`
+    - GET key-value
+     `ab -v 4 [http://]hostname[:webserver port]/[key]`
+
+- Web Server
+
+    `./webserver [webserver port] [redis ip] [redis port]`
+
+- Redis
+
+    `./redis-server --port [redis port]`
+
+
+- Apache Bench (ab)
+    - We will use ab as a benchmark to test the performance of
+    your Web Servers.
+    - Performance Test using Apache Bench:
+        - ab with 1 concurrency 1,000 requests : `$ ab –n 1000 server_ip:server_port`
+        - ab with 100 concurrency, 10,000 requests: `$ ab –c 100 -n 10000 server_ip:server_port`
+    - Other options (run ab for more options)
+    -p : postfile
+    -v : verbosity
+    -T : content-type **(**Note for Bonus: you should set this to application/x-www-form-urlencoded)
+
+
+
+
+
+
+## Design Report for webserver_multi.cpp (**IMPORTANT**)
+
+1. Explanation about thread pool, task queue, and task allocation (10 points)
+    - design of thread pool, task queue: I designed the threadpool using 10 worker threads. The listener would call a method named init_pool when we start the server it will distribute 4 bufferevents that will be used for redis connection  to each thread. The listener thread( which is main thread) also allocates 10 event bases for each thread. When the listener thread spawn threads the threads will be in method activate_workers which is an infinite loop and only one thread has access to a job_queue at a time until it unlocks the mutex. the single worker thread will wait for a job in a conditional variable and when the listener thread adds a job to the thread pool it will notify that single worker then the worker thread will call the function dispatch which serves the client and returns the value and frees andy allocated memory. my write call back for client bufferevent has a logic to detect when the thread served the client and finished and will shut down the connection. The task allocation is a FIFO, using a single queue, which is achieved by the mutex lock _mutex_lock. I also used a queue to store the jobs which will be done by the worker threads. so the front job in the queue will be dispatched first before any other jobs. 
+
+    - task allocation policy: the task allocation policy is the listener thread will give a socket and the thread will communicate with the client using the socket from the listener thread. The tasks are dequeued one by one in a FIFO fashion.
+
+
+2. Explanation about Managing Redis connection, connection allocation (10 points)
+    - Redis connection allocation policy
+- redis connection allocation policy is I allocated redis connections in the listener thread(using their own bases allocated a bufferevent)  and distributed to the thread pool. each thread received 4 file descriptors(so also bufferevents). so max number of connection per thread is 4( FDS_PER_THREAD). The way I use this connections are i have 4 bufferevents for each thread so each worker has a field that stores the current_index the index. so the worker thread will use the bufferevent at index 0 first then will use the bufferevent at index 2 next time it gets notified by the listener thread and bufferevent at index 2 and then 3. and it repeats from the start like this so that we use all connections fairly. I noticed that it is necessary to drain the bufferevents after the the thread serves the client so I drained each bufferevents after I use it and will be cleaner for next use.
 
