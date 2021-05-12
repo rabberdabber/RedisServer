@@ -21,9 +21,13 @@ $ ./redis-cli - p [port]
 ### Running Example
 
 protocol:
-      GET: https://127.0.0.1:port/[key]
 
       POST: (inside the post body) [key]=[value]&[key]=[value]&[key]=[value]
+      
+      
+      GET: `https://127.0.0.1:port/[key]`
+
+
 
 - Client
     - POST file that contains the key-value pairs
